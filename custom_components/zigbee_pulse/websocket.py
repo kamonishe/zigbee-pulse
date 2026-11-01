@@ -55,6 +55,7 @@ def _devices(hass, settings):
             "entity_id": entity.entity_id,
             "name": name,
             "state": state.state if state else "unknown",
+            "power_source": "battery" if entity.device_id in battery_devices else "mains",
             "rule": rule,
             "timeout": timeout,
         })
