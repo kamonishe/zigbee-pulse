@@ -27,4 +27,3 @@ The integration establishes a baseline during the startup grace period, then sen
 ## Manual installation
 
 Copy `custom_components/zigbee_pulse` into the `custom_components` directory in your Home Assistant configuration, restart Home Assistant, and add **Zigbee Pulse** from **Settings → Devices & services**.
-
