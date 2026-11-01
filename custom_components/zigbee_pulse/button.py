@@ -2,6 +2,8 @@
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
 
+from .const import DOMAIN
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     async_add_entities([TestNotificationButton(entry)])
@@ -16,6 +18,12 @@ class TestNotificationButton(ButtonEntity):
         self._coordinator = entry.runtime_data
         self._attr_unique_id = f"{entry.entry_id}_test"
         self._attr_name = f"{entry.title} test notification"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry.entry_id)},
+            "name": entry.title,
+            "manufacturer": "Zigbee Pulse",
+            "model": "Zigbee2MQTT health monitor",
+        }
 
     async def async_press(self):
         await self._coordinator.send(
