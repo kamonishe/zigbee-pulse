@@ -2,7 +2,7 @@
 from pathlib import Path
 from time import monotonic
 
-from homeassistant.components import frontend, panel_custom
+from homeassistant.components import frontend
 from homeassistant.const import Platform
 from homeassistant.core import callback
 from homeassistant.helpers.start import async_at_started
@@ -21,26 +21,33 @@ def _settings(entry):
 
 
 async def _sync_sidebar(hass):
-    """Show the sidebar panel when at least one entry enables it."""
-    show_sidebar = any(
-        _settings(entry).get("show_sidebar", True)
-        for entry in hass.config_entries.async_entries(DOMAIN)
-    )
-    if not show_sidebar:
+    """Keep the dashboard registered and control only its sidebar visibility."""
+    entries = hass.config_entries.async_entries(DOMAIN)
+    if not entries:
         frontend.async_remove_panel(hass, DOMAIN, warn_if_unknown=False)
         return
-    if frontend.async_panel_exists(hass, DOMAIN):
-        return
-    await panel_custom.async_register_panel(
+    show_sidebar = any(
+        _settings(entry).get("show_sidebar", True) for entry in entries
+    )
+    frontend.async_register_built_in_panel(
         hass,
-        webcomponent_name="zigbee-pulse-panel",
-        frontend_url_path=DOMAIN,
+        component_name="custom",
         sidebar_title="Zigbee Pulse",
         sidebar_icon="mdi:zigbee",
-        module_url=f"{PANEL_PATH}/zigbee-pulse-panel.js",
-        embed_iframe=False,
+        frontend_url_path=DOMAIN,
+        config={
+            "_panel_custom": {
+                "name": "zigbee-pulse-panel",
+                "embed_iframe": False,
+                "trust_external": False,
+                "handle_safe_area": False,
+                "module_url": f"{PANEL_PATH}/zigbee-pulse-panel.js",
+            }
+        },
         require_admin=True,
+        update=frontend.async_panel_exists(hass, DOMAIN),
         config_panel_domain=DOMAIN,
+        show_in_sidebar=show_sidebar,
     )
 
 
