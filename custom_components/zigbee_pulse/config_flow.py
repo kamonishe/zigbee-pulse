@@ -40,6 +40,7 @@ def _global_schema(values):
         vol.Required("startup_grace", default=values["startup_grace"]): vol.All(
             vol.Coerce(int), vol.Range(min=0, max=120)),
         vol.Required("enabled", default=values["enabled"]): selector.BooleanSelector(),
+        vol.Required("show_sidebar", default=values["show_sidebar"]): selector.BooleanSelector(),
     })
 
 

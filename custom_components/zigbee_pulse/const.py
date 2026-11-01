@@ -3,6 +3,7 @@ DOMAIN = "zigbee_pulse"
 DEFAULTS = {
     "name": "Zigbee Pulse",
     "enabled": True,
+    "show_sidebar": True,
     "recipient": "",
     "default_timeout": 360,
     "mains_timeout": 30,

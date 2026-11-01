@@ -2,13 +2,13 @@
 from pathlib import Path
 from time import monotonic
 
-from homeassistant.components import panel_custom
+from homeassistant.components import frontend, panel_custom
 from homeassistant.const import Platform
 from homeassistant.core import callback
 from homeassistant.helpers.start import async_at_started
 from homeassistant.components.http import StaticPathConfig
 
-from .const import DOMAIN
+from .const import DEFAULTS, DOMAIN
 from .coordinator import HealthCoordinator
 from .websocket import async_register as async_register_websocket
 
@@ -16,12 +16,21 @@ PLATFORMS = [Platform.SENSOR, Platform.BUTTON]
 PANEL_PATH = f"/{DOMAIN}_panel"
 
 
-async def async_setup(hass, config):
-    """Register the sidebar panel and its authenticated API once."""
-    await hass.http.async_register_static_paths([
-        StaticPathConfig(PANEL_PATH, str(Path(__file__).parent / "frontend"), cache_headers=False)
-    ])
-    async_register_websocket(hass)
+def _settings(entry):
+    return DEFAULTS | dict(entry.data) | dict(entry.options)
+
+
+async def _sync_sidebar(hass):
+    """Show the sidebar panel when at least one entry enables it."""
+    show_sidebar = any(
+        _settings(entry).get("show_sidebar", True)
+        for entry in hass.config_entries.async_entries(DOMAIN)
+    )
+    if not show_sidebar:
+        frontend.async_remove_panel(hass, DOMAIN, warn_if_unknown=False)
+        return
+    if frontend.async_panel_exists(hass, DOMAIN):
+        return
     await panel_custom.async_register_panel(
         hass,
         webcomponent_name="zigbee-pulse-panel",
@@ -33,10 +42,19 @@ async def async_setup(hass, config):
         require_admin=True,
         config_panel_domain=DOMAIN,
     )
+
+
+async def async_setup(hass, config):
+    """Register static panel assets and the authenticated API."""
+    await hass.http.async_register_static_paths([
+        StaticPathConfig(PANEL_PATH, str(Path(__file__).parent / "frontend"), cache_headers=False)
+    ])
+    async_register_websocket(hass)
     return True
 
 
 async def async_setup_entry(hass, entry):
+    await _sync_sidebar(hass)
     coordinator = HealthCoordinator(hass, entry)
     entry.runtime_data = coordinator
 
@@ -57,4 +75,6 @@ async def async_reload_entry(hass, entry):
 
 
 async def async_unload_entry(hass, entry):
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    result = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    await _sync_sidebar(hass)
+    return result

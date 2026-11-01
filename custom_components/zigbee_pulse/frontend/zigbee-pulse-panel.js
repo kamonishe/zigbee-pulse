@@ -98,6 +98,7 @@ class ZigbeePulsePanel extends HTMLElement {
             <label>Temperature timeout (minutes)<input type="number" min="1" name="temperature_timeout" value="${settings.temperature_timeout}"></label>
             <label>Startup grace (minutes)<input type="number" min="0" name="startup_grace" value="${settings.startup_grace}"></label>
             <label class="check"><input type="checkbox" name="enabled" ${settings.enabled ? "checked" : ""}> Enable notifications</label>
+            <label class="check"><input type="checkbox" name="show_sidebar" ${settings.show_sidebar ? "checked" : ""}> Show Zigbee Pulse in sidebar</label>
             <button class="primary" type="submit">Save global settings</button><output id="global-result"></output>
           </form>
         </section>
@@ -151,7 +152,7 @@ class ZigbeePulsePanel extends HTMLElement {
     const form = new FormData(event.target);
     const result = event.target.querySelector("output");
     await this._save({ type: "zigbee_pulse/update_config", entry_id: entry.entry_id, scope: "global", settings: {
-      name: form.get("name"), recipient: form.get("recipient"), default_timeout: Number(form.get("default_timeout")), mains_timeout: Number(form.get("mains_timeout")), temperature_timeout: Number(form.get("temperature_timeout")), startup_grace: Number(form.get("startup_grace")), enabled: form.get("enabled") === "on",
+      name: form.get("name"), recipient: form.get("recipient"), default_timeout: Number(form.get("default_timeout")), mains_timeout: Number(form.get("mains_timeout")), temperature_timeout: Number(form.get("temperature_timeout")), startup_grace: Number(form.get("startup_grace")), enabled: form.get("enabled") === "on", show_sidebar: form.get("show_sidebar") === "on",
     }}, result);
   }
 

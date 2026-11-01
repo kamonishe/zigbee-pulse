@@ -89,7 +89,7 @@ async def ws_update_config(hass, connection, msg):
     settings = DEFAULTS | dict(entry.data) | dict(entry.options)
     incoming = msg.get("settings") or {}
     if msg["scope"] == "global":
-        allowed = {"name", "recipient", "default_timeout", "mains_timeout", "temperature_timeout", "startup_grace", "enabled"}
+        allowed = {"name", "recipient", "default_timeout", "mains_timeout", "temperature_timeout", "startup_grace", "enabled", "show_sidebar"}
         merged = settings | {key: incoming[key] for key in allowed if key in incoming}
         if not merged["name"].strip() or not merged["recipient"]:
             connection.send_error(msg["id"], "invalid", "Name and Telegram recipient are required")

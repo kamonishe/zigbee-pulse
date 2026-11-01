@@ -12,7 +12,8 @@
           "mains_timeout": "Mains devices: timeout (minutes)",
           "temperature_timeout": "Temperature sensors: timeout (minutes)",
           "startup_grace": "Startup grace period (minutes)",
-          "enabled": "Enable notifications"
+          "enabled": "Enable notifications",
+          "show_sidebar": "Show Zigbee Pulse in the Home Assistant sidebar"
         }
       }
     },
@@ -39,7 +40,8 @@
           "mains_timeout": "Mains devices: timeout (minutes)",
           "temperature_timeout": "Temperature sensors: timeout (minutes)",
           "startup_grace": "Startup grace period (minutes)",
-          "enabled": "Enable notifications"
+          "enabled": "Enable notifications",
+          "show_sidebar": "Show Zigbee Pulse in the Home Assistant sidebar"
         }
       },
       "devices": {
