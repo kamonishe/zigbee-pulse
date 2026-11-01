@@ -135,11 +135,28 @@ class ZigbeePulsePanel extends HTMLElement {
       </form></article>`;
   }
 
+  _bindDeviceForms(entry) {
+    this.shadowRoot.querySelectorAll(".device-form").forEach((form) =>
+      form.addEventListener("submit", (event) => this._saveDevice(event, entry)));
+  }
+
   _bind(entry) {
     this.shadowRoot.querySelector("#refresh")?.addEventListener("click", () => this._load());
     this.shadowRoot.querySelector("#filter")?.addEventListener("input", (event) => {
+      event.stopPropagation();
       this._filter = event.target.value;
-      this._render();
+      const live = this._liveState();
+      const filter = this._filter.toLowerCase();
+      const devices = entry.devices.filter((device) =>
+        !filter || `${device.name} ${device.entity_id}`.toLowerCase().includes(filter));
+      const recipientOptions = (this._data.recipients || []).map((recipient) =>
+        `<option value="${this._escape(recipient.entity_id)}">${this._escape(recipient.name || recipient.entity_id)}</option>`).join("");
+      const container = this.shadowRoot.querySelector(".devices");
+      if (container) {
+        const cards = devices.map((device) => this._deviceCard(device, entry.settings, live, recipientOptions)).join("");
+        container.innerHTML = cards || "<p>No matching devices.</p>";
+        this._bindDeviceForms(entry);
+      }
     });
     this.shadowRoot.querySelector("#test")?.addEventListener("click", async () => {
       await this._hass.callService("telegram_bot", "send_message", {
@@ -147,8 +164,7 @@ class ZigbeePulsePanel extends HTMLElement {
       });
     });
     this.shadowRoot.querySelector("#global-form")?.addEventListener("submit", (event) => this._saveGlobal(event, entry));
-    this.shadowRoot.querySelectorAll(".device-form").forEach((form) =>
-      form.addEventListener("submit", (event) => this._saveDevice(event, entry)));
+    this._bindDeviceForms(entry);
     this.shadowRoot.addEventListener("focusin", () => { this._editing = true; });
     this.shadowRoot.addEventListener("focusout", () => { this._editing = false; });
   }
