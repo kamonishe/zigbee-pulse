@@ -189,8 +189,8 @@ class ZigbeePulsePanel extends HTMLElement {
                 <p id="message-parser-status" class="template-status"></p>
               </div>
             </div>
-            <div class="message-actions"><button class="primary" type="submit">Save message layout</button><output id="message-result"></output></div>
             <p class="muted template-legend">Variables: <code>{monitor_name}</code> <code>{event}</code> <code>{device_name}</code> <code>{entity_id}</code> <code>{newly_stale}</code> <code>{stale_count}</code> <code>{stale_list}</code> <code>{recovered_count}</code> <code>{recovered_list}</code> <code>{timestamp}</code></p>
+            <div class="message-actions"><button class="primary" type="submit">Save message layout</button><output id="message-result"></output></div>
           </form>
         </section>
         <section class="card"><div class="device-heading"><h2>Per-device settings</h2><input id="filter" placeholder="Filter devices" value="${this._escape(this._filter)}"></div>
