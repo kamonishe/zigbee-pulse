@@ -20,6 +20,9 @@
     "error": {
       "invalid_name": "Enter a monitor name.",
       "invalid_recipient": "Select an enabled Telegram bot notification entity."
+    },
+    "abort": {
+      "no_devices": "No enabled Zigbee2MQTT last_seen sensors were found."
     }
   },
   "options": {
@@ -67,8 +70,5 @@
       "invalid_name": "Enter a monitor name.",
       "invalid_recipient": "Select an enabled Telegram bot notification entity."
     }
-  },
-  "abort": {
-    "no_devices": "No enabled Zigbee2MQTT last_seen sensors were found."
   }
 }
