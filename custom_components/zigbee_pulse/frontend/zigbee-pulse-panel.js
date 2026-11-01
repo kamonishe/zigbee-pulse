@@ -69,6 +69,74 @@ class ZigbeePulsePanel extends HTMLElement {
     return { healthy: "Healthy", offline: "Offline", unknown: "Unknown", unavailable: "Unavailable" }[status] || "Unknown";
   }
 
+  _elapsed(seconds) {
+    if (seconds === null || seconds === undefined || !Number.isFinite(Number(seconds))) return "Unknown";
+    const total = Math.max(0, Math.floor(Number(seconds) / 60));
+    const days = Math.floor(total / 1440);
+    const hours = Math.floor((total % 1440) / 60);
+    const minutes = total % 60;
+    const parts = [];
+    if (days) parts.push(`${days} day${days === 1 ? "" : "s"}`);
+    if (hours) parts.push(`${hours} hour${hours === 1 ? "" : "s"}`);
+    if (minutes || !parts.length) parts.push(`${minutes} minute${minutes === 1 ? "" : "s"}`);
+    return parts.join(" and ");
+  }
+
+  _messageValues(entry, kind) {
+    const liveDevices = this._liveState()?.attributes?.devices || {};
+    const devices = entry.devices || [];
+    const stale = devices.filter((device) => liveDevices[device.entity_id]?.stale);
+    const example = stale[0] || devices[0] || {
+      name: "Example Zigbee device", entity_id: "sensor.example_last_seen",
+    };
+    const selected = kind === "offline" ? (stale.length ? stale : [example]) : [example];
+    const staleForList = stale.length ? stale : [example];
+    const names = selected.map((device) => `• ${device.name}`).join("\n");
+    const staleList = staleForList.map((device, index) =>
+      `${index + 1}. ${device.name} — ${this._elapsed(liveDevices[device.entity_id]?.silence_seconds)}`).join("\n");
+    const recoveredList = selected.map((device, index) => `${index + 1}. ${device.name}`).join("\n");
+    return {
+      monitor_name: entry.settings?.name || entry.title || "Zigbee Pulse",
+      event: kind === "offline" ? "Device Offline" : "Device Online",
+      status: kind === "offline" ? "Offline" : "Online",
+      device_name: example.name,
+      entity_id: example.entity_id,
+      timestamp: new Date().toLocaleString(),
+      newly_stale: names,
+      stale_count: Math.max(stale.length, 1),
+      stale_list: staleList,
+      recovered_count: selected.length,
+      recovered_list: recoveredList,
+    };
+  }
+
+  _renderMessageTemplate(template, values) {
+    return String(template || "").replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (match, name) =>
+      Object.prototype.hasOwnProperty.call(values, name) ? values[name] : `[unknown: ${name}]`);
+  }
+
+  _messagePreview(entry) {
+    const kind = this.shadowRoot.querySelector("#preview-kind")?.value || "offline";
+    const template = this.shadowRoot.querySelector(`#${kind}-template`)?.value
+      ?? entry.settings[`${kind}_template`];
+    return this._renderMessageTemplate(template, this._messageValues(entry, kind));
+  }
+
+  _updateMessagePreview(entry) {
+    const preview = this.shadowRoot.querySelector("#message-preview");
+    if (preview) preview.textContent = this._messagePreview(entry);
+    const status = this.shadowRoot.querySelector("#message-parser-status");
+    if (!status) return;
+    const kind = this.shadowRoot.querySelector("#preview-kind")?.value || "offline";
+    const template = this.shadowRoot.querySelector(`#${kind}-template`)?.value || "";
+    const allowed = new Set(["monitor_name", "event", "status", "device_name", "entity_id", "timestamp", "newly_stale", "stale_count", "stale_list", "recovered_count", "recovered_list"]);
+    const unknown = [...new Set([...template.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map((match) => match[1]).filter((name) => !allowed.has(name)))];
+    status.textContent = unknown.length
+      ? `Unknown variable${unknown.length === 1 ? "" : "s"}: ${unknown.map((name) => `{${name}}`).join(", ")}`
+      : "Preview updates as you type using the current monitored devices.";
+    status.className = unknown.length ? "template-status error" : "template-status";
+  }
+
   _render() {
     if (!this.shadowRoot || !this._hass) return;
     const entry = this._entry();
@@ -106,6 +174,21 @@ class ZigbeePulsePanel extends HTMLElement {
             <label class="check"><input type="checkbox" name="enabled" ${settings.enabled ? "checked" : ""}> Enable notifications</label>
             <label class="check"><input type="checkbox" name="show_sidebar" ${settings.show_sidebar ? "checked" : ""}> Show Zigbee Pulse in sidebar</label>
             <button class="primary" type="submit">Save global settings</button><output id="global-result"></output>
+          </form>
+        </section>
+        <section class="card">
+          <h2>Telegram message layout</h2>
+          <p class="muted">Edit the offline and recovery messages. The preview parses variables against the current device data as you type.</p>
+          <form id="message-form">
+            <div class="template-grid">
+              <label>Offline message<textarea id="offline-template" name="offline_template" rows="8">${this._escape(settings.offline_template)}</textarea></label>
+              <label>Recovery message<textarea id="recovery-template" name="recovery_template" rows="8">${this._escape(settings.recovery_template)}</textarea></label>
+            </div>
+            <div class="preview-heading"><h3>Live result</h3><select id="preview-kind"><option value="offline">Offline preview</option><option value="recovery">Recovery preview</option></select></div>
+            <pre id="message-preview" class="message-preview"></pre>
+            <p id="message-parser-status" class="template-status"></p>
+            <p class="muted">Variables: <code>{monitor_name}</code> <code>{event}</code> <code>{device_name}</code> <code>{entity_id}</code> <code>{newly_stale}</code> <code>{stale_count}</code> <code>{stale_list}</code> <code>{recovered_count}</code> <code>{recovered_list}</code> <code>{timestamp}</code></p>
+            <div><button class="primary" type="submit">Save message layout</button><output id="message-result"></output></div>
           </form>
         </section>
         <section class="card"><div class="device-heading"><h2>Per-device settings</h2><input id="filter" placeholder="Filter devices" value="${this._escape(this._filter)}"></div>
@@ -163,10 +246,15 @@ class ZigbeePulsePanel extends HTMLElement {
     });
     this.shadowRoot.querySelector("#test")?.addEventListener("click", async () => {
       await this._hass.callService("telegram_bot", "send_message", {
-        entity_id: entry.settings.recipient, message: `Zigbee Pulse test: ${entry.title}`, parse_mode: "plain_text",
+        entity_id: entry.settings.recipient, message: this._messagePreview(entry), parse_mode: "plain_text",
       });
     });
     this.shadowRoot.querySelector("#global-form")?.addEventListener("submit", (event) => this._saveGlobal(event, entry));
+    this.shadowRoot.querySelector("#message-form")?.addEventListener("submit", (event) => this._saveMessages(event, entry));
+    ["#offline-template", "#recovery-template"].forEach((selector) =>
+      this.shadowRoot.querySelector(selector)?.addEventListener("input", () => this._updateMessagePreview(entry)));
+    this.shadowRoot.querySelector("#preview-kind")?.addEventListener("change", () => this._updateMessagePreview(entry));
+    this._updateMessagePreview(entry);
     this._bindDeviceForms(entry);
     this.shadowRoot.addEventListener("focusin", () => { this._editing = true; });
     this.shadowRoot.addEventListener("focusout", () => { this._editing = false; });
@@ -178,6 +266,15 @@ class ZigbeePulsePanel extends HTMLElement {
     const result = event.target.querySelector("output");
     await this._save({ type: "zigbee_pulse/update_config", entry_id: entry.entry_id, scope: "global", settings: {
       name: form.get("name"), recipient: form.get("recipient"), default_timeout: Number(form.get("default_timeout")), mains_timeout: Number(form.get("mains_timeout")), temperature_timeout: Number(form.get("temperature_timeout")), startup_grace: Number(form.get("startup_grace")), enabled: form.get("enabled") === "on", show_sidebar: form.get("show_sidebar") === "on",
+    }}, result);
+  }
+
+  async _saveMessages(event, entry) {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    const result = event.target.querySelector("#message-result");
+    await this._save({ type: "zigbee_pulse/update_config", entry_id: entry.entry_id, scope: "global", settings: {
+      offline_template: form.get("offline_template"), recovery_template: form.get("recovery_template"),
     }}, result);
   }
 
@@ -206,7 +303,7 @@ class ZigbeePulsePanel extends HTMLElement {
   }
 
   _styles() {
-    return `:host{display:block;color:var(--primary-text-color);background:var(--primary-background-color);min-height:100vh}main{max-width:1200px;margin:0 auto;padding:28px}header,.device-heading,.device-title{display:flex;align-items:center;justify-content:space-between;gap:16px}h1{font-size:28px;margin:0 0 6px}.brand{display:flex;align-items:center;gap:14px}.brand-icon{display:block;width:64px;height:64px;object-fit:contain}.brand p{margin:0}h2{font-size:20px;margin:0 0 18px}h3{margin:0 0 4px;font-size:17px}.card{background:var(--card-background-color);border-radius:12px;padding:22px;margin:20px 0;box-shadow:var(--ha-card-box-shadow,0 2px 6px #0002)}.summary{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:12px;margin:24px 0}.summary div{background:var(--card-background-color);border-radius:12px;padding:18px}.summary strong,.summary span{display:block}.summary strong{font-size:24px}.summary span,.muted,code{color:var(--secondary-text-color);font-size:13px}form{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;align-items:end}label{display:grid;gap:6px;font-size:13px}input,select{box-sizing:border-box;width:100%;padding:10px;border:1px solid var(--divider-color);border-radius:6px;background:var(--primary-background-color);color:var(--primary-text-color);font:inherit}.check{display:flex;display:flex;grid-template-columns:auto 1fr;align-items:center;gap:8px}.check input{width:auto}button,.button{border:0;border-radius:7px;padding:10px 14px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;cursor:pointer;text-decoration:none;text-align:center}.primary{background:var(--primary-color);color:var(--text-primary-color,#fff)}output{color:var(--success-color,#4caf50);font-size:13px}.devices{display:grid;gap:14px}.device{border:1px solid var(--divider-color);border-left:5px solid var(--success-color,#4caf50);border-radius:8px;padding:16px}.device.offline{border-left-color:var(--error-color,#f44336)}.device.unknown,.device.unavailable{border-left-color:var(--disabled-text-color,var(--secondary-text-color,#9e9e9e))}.device-power{display:inline-flex;vertical-align:-3px;margin-right:7px;color:var(--secondary-text-color)}.device-power ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.pill{border-radius:999px;padding:4px 9px;font-size:12px;background:#19875422;color:var(--success-color,#4caf50)}.offline .pill{background:#f4433622;color:var(--error-color,#f44336)}.unknown .pill,.unavailable .pill{background:#9e9e9e33;color:var(--disabled-text-color,var(--secondary-text-color,#9e9e9e))}@media(max-width:700px){main{padding:16px}.summary{grid-template-columns:1fr 1fr}.summary button{grid-column:1/-1}}
+    return `:host{display:block;color:var(--primary-text-color);background:var(--primary-background-color);min-height:100vh}main{max-width:1200px;margin:0 auto;padding:28px}header,.device-heading,.device-title{display:flex;align-items:center;justify-content:space-between;gap:16px}h1{font-size:28px;margin:0 0 6px}.brand{display:flex;align-items:center;gap:14px}.brand-icon{display:block;width:64px;height:64px;object-fit:contain}.brand p{margin:0}h2{font-size:20px;margin:0 0 18px}h3{margin:0 0 4px;font-size:17px}.card{background:var(--card-background-color);border-radius:12px;padding:22px;margin:20px 0;box-shadow:var(--ha-card-box-shadow,0 2px 6px #0002)}.summary{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:12px;margin:24px 0}.summary div{background:var(--card-background-color);border-radius:12px;padding:18px}.summary strong,.summary span{display:block}.summary strong{font-size:24px}.summary span,.muted,code{color:var(--secondary-text-color);font-size:13px}form{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;align-items:end}label{display:grid;gap:6px;font-size:13px}input,select,textarea{box-sizing:border-box;width:100%;padding:10px;border:1px solid var(--divider-color);border-radius:6px;background:var(--primary-background-color);color:var(--primary-text-color);font:inherit}textarea{resize:vertical;min-height:150px;line-height:1.4}.check{display:flex;display:flex;grid-template-columns:auto 1fr;align-items:center;gap:8px}.check input{width:auto}button,.button{border:0;border-radius:7px;padding:10px 14px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;cursor:pointer;text-decoration:none;text-align:center}.primary{background:var(--primary-color);color:var(--text-primary-color,#fff)}output{color:var(--success-color,#4caf50);font-size:13px}.template-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.preview-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}.preview-heading h3{margin:0}.message-preview{margin:0;padding:16px;min-height:120px;white-space:pre-wrap;overflow:auto;border:1px solid var(--divider-color);border-radius:8px;background:var(--primary-background-color);font:inherit}.template-status{margin:0;color:var(--secondary-text-color);font-size:13px}.template-status.error{color:var(--error-color,#f44336)}.devices{display:grid;gap:14px}.device{border:1px solid var(--divider-color);border-left:5px solid var(--success-color,#4caf50);border-radius:8px;padding:16px}.device.offline{border-left-color:var(--error-color,#f44336)}.device.unknown,.device.unavailable{border-left-color:var(--disabled-text-color,var(--secondary-text-color,#9e9e9e))}.device-power{display:inline-flex;vertical-align:-3px;margin-right:7px;color:var(--secondary-text-color)}.device-power ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.pill{border-radius:999px;padding:4px 9px;font-size:12px;background:#19875422;color:var(--success-color,#4caf50)}.offline .pill{background:#f4433622;color:var(--error-color,#f44336)}.unknown .pill,.unavailable .pill{background:#9e9e9e33;color:var(--disabled-text-color,var(--secondary-text-color,#9e9e9e))}@media(max-width:700px){main{padding:16px}.summary{grid-template-columns:1fr 1fr}.template-grid{grid-template-columns:1fr}.summary button{grid-column:1/-1}}
 `;
   }
 }

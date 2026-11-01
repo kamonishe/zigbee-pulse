@@ -2,8 +2,9 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import math
+import re
 
-from .const import MAINS_SUFFIXES
+from .const import MAINS_SUFFIXES, OFFLINE_TEMPLATE, RECOVERY_TEMPLATE, TEMPLATE_FIELDS
 
 
 @dataclass(frozen=True)
@@ -63,22 +64,70 @@ def elapsed(age):
     return " and ".join((" ".join(parts[:-1]), parts[-1])) if len(parts) > 1 else parts[0]
 
 
-def messages(newly_stale, recovered, devices):
-    """Return separate offline and recovery summaries."""
-    stale = sorted((d for d in devices.values() if d.stale),
-                   key=lambda d: (d.age if d.age is not None else float("inf"), d.name))
+_TEMPLATE_FIELD_PATTERN = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def unknown_template_fields(template):
+    """Return placeholder names that Zigbee Pulse cannot render."""
+    return sorted({
+        field for field in _TEMPLATE_FIELD_PATTERN.findall(template)
+        if field not in TEMPLATE_FIELDS
+    })
+
+
+def render_template(template, values):
+    """Render known placeholders and leave escaped/unknown text untouched."""
+    return _TEMPLATE_FIELD_PATTERN.sub(
+        lambda match: str(values.get(match.group(1), match.group(0))), template)
+
+
+def _message_values(kind, newly_stale, recovered, devices, settings):
+    stale = sorted(
+        (device for device in devices.values() if device.stale),
+        key=lambda device: (device.age if device.age is not None else float("inf"), device.name),
+    )
+    selected = newly_stale if kind == "offline" else recovered
+    selected_devices = [devices[entity_id] for entity_id in sorted(selected) if entity_id in devices]
+    selected_names = [device.name for device in selected_devices]
+    stale_names = [f"• {name}" for name in selected_names] if kind == "offline" else []
+    stale_list = "\n".join(
+        f"{index}. {device.name} — {elapsed(device.age)}"
+        for index, device in enumerate(stale, 1)
+    )
+    recovered_list = "\n".join(
+        f"{index}. {device.name}"
+        for index, device in enumerate(selected_devices, 1)
+    )
+    first = selected_devices[0] if selected_devices else None
+    event = "Device Offline" if kind == "offline" else "Device Online"
+    return {
+        "monitor_name": settings.get("name", "Zigbee Pulse"),
+        "event": event,
+        "status": "Offline" if kind == "offline" else "Online",
+        "device_name": first.name if first else "",
+        "entity_id": first.entity_id if first else "",
+        "timestamp": datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z"),
+        "newly_stale": "\n".join(stale_names),
+        "stale_count": len(stale),
+        "stale_list": stale_list,
+        "recovered_count": len(recovered),
+        "recovered_list": recovered_list,
+    }
+
+
+def messages(newly_stale, recovered, devices, settings=None):
+    """Return formatted offline and recovery summaries."""
+    settings = settings or {}
     offline = online = None
     if newly_stale:
-        names = "\n".join(f"• {devices[e].name}" for e in sorted(newly_stale))
-        listing = "\n".join(f"{i}. {d.name} — {elapsed(d.age)}" for i, d in enumerate(stale, 1))
-        offline = (f"🔴 Zigbee Device Offline\n\nNewly stale:\n{names}"
-                   f"\n\nCurrently stale: {len(stale)} device(s)\n\n{listing}")
+        template = settings.get("offline_template", OFFLINE_TEMPLATE)
+        offline = render_template(
+            template, _message_values("offline", newly_stale, recovered, devices, settings))
     if recovered:
-        listing = "\n".join(f"{i}. {devices[e].name}" for i, e in enumerate(sorted(recovered), 1))
-        online = (f"🟢 Zigbee Device Online\n\nCommunication restored:\n\n{listing}"
-                  f"\n\nStill stale: {len(stale)} device(s)")
+        template = settings.get("recovery_template", RECOVERY_TEMPLATE)
+        online = render_template(
+            template, _message_values("recovery", newly_stale, recovered, devices, settings))
     return offline, online
-
 
 def split_message(message, limit=3500):
     """Split by UTF-16 units, preserving lines when possible (Telegram limit 4096)."""

@@ -7,7 +7,7 @@ import voluptuous as vol
 
 from .const import DEFAULTS, DEVICE_DEFAULTS, DOMAIN
 from .coordinator import is_last_seen
-from .rules import timeout_minutes_for
+from .rules import timeout_minutes_for, unknown_template_fields
 
 GET = {vol.Required("type"): "zigbee_pulse/get_config"}
 UPDATE = {
@@ -90,7 +90,17 @@ async def ws_update_config(hass, connection, msg):
     settings = DEFAULTS | dict(entry.data) | dict(entry.options)
     incoming = msg.get("settings") or {}
     if msg["scope"] == "global":
-        allowed = {"name", "recipient", "default_timeout", "mains_timeout", "temperature_timeout", "startup_grace", "enabled", "show_sidebar"}
+        allowed = {"name", "recipient", "default_timeout", "mains_timeout", "temperature_timeout", "startup_grace", "enabled", "show_sidebar", "offline_template", "recovery_template"}
+        for template_key in ("offline_template", "recovery_template"):
+            if template_key in incoming:
+                template = incoming[template_key]
+                if not isinstance(template, str) or not template.strip():
+                    connection.send_error(msg["id"], "invalid_template", "Message templates cannot be empty")
+                    return
+                unknown = unknown_template_fields(template)
+                if unknown:
+                    connection.send_error(msg["id"], "invalid_template", f"Unknown template variable(s): {', '.join(unknown)}")
+                    return
         merged = settings | {key: incoming[key] for key in allowed if key in incoming}
         if not merged["name"].strip() or not merged["recipient"]:
             connection.send_error(msg["id"], "invalid", "Name and Telegram recipient are required")

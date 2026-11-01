@@ -88,7 +88,7 @@ class HealthCoordinator(DataUpdateCoordinator):
                      if self.rule_for(key)["recipient"] == recipient}
             offline = selected if kind == "offline" else set()
             recovery = selected if kind == "recovery" else set()
-            offline_message, recovery_message = messages(offline, recovery, scope)
+            offline_message, recovery_message = messages(offline, recovery, scope, self.settings)
             message = offline_message or recovery_message
             if message:
                 await self.send(message, recipient)
