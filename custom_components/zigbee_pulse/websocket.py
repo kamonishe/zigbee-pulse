@@ -7,6 +7,7 @@ import voluptuous as vol
 
 from .const import DEFAULTS, DEVICE_DEFAULTS, DOMAIN
 from .coordinator import is_last_seen
+from .rules import timeout_minutes_for
 
 GET = {vol.Required("type"): "zigbee_pulse/get_config"}
 UPDATE = {
@@ -30,6 +31,16 @@ def _recipients(hass):
 def _devices(hass, settings):
     entities = er.async_get(hass)
     devices = dr.async_get(hass)
+    battery_devices = set()
+    for entity in entities.entities.values():
+        state = hass.states.get(entity.entity_id)
+        if entity.device_id and (
+            entity.device_class == "battery"
+            or entity.original_device_class == "battery"
+            or entity.entity_id.endswith("_battery")
+            or (state and state.attributes.get("device_class") == "battery")
+        ):
+            battery_devices.add(entity.device_id)
     result = []
     for entity in entities.entities.values():
         if not is_last_seen(entity):
@@ -38,7 +49,8 @@ def _devices(hass, settings):
         name = ((device.name_by_user or device.name) if device else None) or entity.entity_id
         state = hass.states.get(entity.entity_id)
         rule = DEVICE_DEFAULTS | {"recipient": settings["recipient"]} | settings.get("device_rules", {}).get(entity.entity_id, {})
-        timeout = rule["timeout"] or (settings["temperature_timeout"] if "temperature" in entity.entity_id else settings["default_timeout"])
+        timeout = rule["timeout"] or timeout_minutes_for(
+            entity.entity_id, entity.device_id in battery_devices, settings)
         result.append({
             "entity_id": entity.entity_id,
             "name": name,

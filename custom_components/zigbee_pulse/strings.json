@@ -51,7 +51,7 @@
       },
       "device": {
         "title": "Configure {entity_id}",
-        "description": "Tune this device independently. A timeout of 0 uses the category default.",
+        "description": "Tune this device independently. The current global timeout is {global_timeout} minutes. Enter a different value to override it; a timeout of 0 keeps using the global value.",
         "data": {
           "enabled": "Monitor this device",
           "offline": "Notify when offline",

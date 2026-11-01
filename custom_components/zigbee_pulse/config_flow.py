@@ -7,6 +7,7 @@ from homeassistant.helpers import entity_registry as er, selector
 
 from .const import DEFAULTS, DEVICE_DEFAULTS, DOMAIN
 from .coordinator import is_last_seen
+from .rules import timeout_minutes_for
 
 
 def _device_choices(hass):
@@ -42,13 +43,32 @@ def _global_schema(values):
     })
 
 
-def _device_schema(rule, recipient):
+def _device_timeout(hass, entity_id, settings):
+    """Return the effective global timeout shown for an inherited rule."""
+    registry = er.async_get(hass)
+    battery_devices = set()
+    for entity in registry.entities.values():
+        state = hass.states.get(entity.entity_id)
+        if entity.device_id and (
+            entity.device_class == "battery"
+            or entity.original_device_class == "battery"
+            or entity.entity_id.endswith("_battery")
+            or (state and state.attributes.get("device_class") == "battery")
+        ):
+            battery_devices.add(entity.device_id)
+    entity = registry.async_get(entity_id)
+    has_battery = bool(entity and entity.device_id in battery_devices)
+    return timeout_minutes_for(entity_id, has_battery, settings)
+
+
+def _device_schema(rule, recipient, inherited_timeout):
     rule = DEVICE_DEFAULTS | {"recipient": recipient} | rule
+    timeout = rule["timeout"] or inherited_timeout
     return vol.Schema({
         vol.Required("enabled", default=rule["enabled"]): selector.BooleanSelector(),
         vol.Required("offline", default=rule["offline"]): selector.BooleanSelector(),
         vol.Required("recovery", default=rule["recovery"]): selector.BooleanSelector(),
-        vol.Required("timeout", default=rule["timeout"]): vol.All(
+        vol.Required("timeout", default=timeout): vol.All(
             vol.Coerce(int), vol.Range(min=0, max=10080)),
         vol.Required("recipient", default=rule["recipient"]): _telegram_selector(),
     })
@@ -121,9 +141,18 @@ class OptionsFlow(config_entries.OptionsFlow):
         entity_id = self._selected_entity
         rules = dict(values.get("device_rules", {}))
         if user_input is not None:
+            inherited_timeout = _device_timeout(self.hass, entity_id, values)
+            if (rules.get(entity_id, {}).get("timeout", 0) == 0
+                    and user_input["timeout"] == inherited_timeout):
+                user_input = user_input | {"timeout": 0}
             rules[entity_id] = user_input
             return self._save(values | {"device_rules": rules})
+        inherited_timeout = _device_timeout(self.hass, entity_id, values)
         return self.async_show_form(
-            step_id="device", data_schema=_device_schema(rules.get(entity_id, {}), values["recipient"]),
-            description_placeholders={"entity_id": entity_id},
+            step_id="device", data_schema=_device_schema(
+                rules.get(entity_id, {}), values["recipient"], inherited_timeout),
+            description_placeholders={
+                "entity_id": entity_id,
+                "global_timeout": str(inherited_timeout),
+            },
         )

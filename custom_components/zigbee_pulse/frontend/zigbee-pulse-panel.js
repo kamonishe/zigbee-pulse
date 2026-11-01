@@ -112,13 +112,17 @@ class ZigbeePulsePanel extends HTMLElement {
   _deviceCard(device, settings, live, recipientOptions) {
     const rule = device.rule;
     const status = this._status(device, live);
+    const inherited = Number(rule.timeout) === 0;
+    const timeoutLabel = inherited
+      ? `Timeout (minutes; global: ${device.timeout})`
+      : "Timeout (minutes)";
     const selectedOptions = recipientOptions.replace(`value="${this._escape(rule.recipient)}"`, `value="${this._escape(rule.recipient)}" selected`);
     return `<article class="device ${status}"><div class="device-title"><div><h3>${this._escape(device.name)}</h3><code>${this._escape(device.entity_id)}</code></div><span class="pill">${status === "offline" ? "Offline" : "Healthy"}</span></div>
       <form class="device-form" data-entity="${this._escape(device.entity_id)}">
         <label class="check"><input type="checkbox" name="enabled" ${rule.enabled ? "checked" : ""}> Monitor</label>
         <label class="check"><input type="checkbox" name="offline" ${rule.offline ? "checked" : ""}> Offline alerts</label>
         <label class="check"><input type="checkbox" name="recovery" ${rule.recovery ? "checked" : ""}> Recovery alerts</label>
-        <label>Timeout (minutes; 0 = global)<input type="number" min="0" name="timeout" value="${rule.timeout}"></label>
+        <label>${timeoutLabel}<input type="number" min="0" name="timeout" value="${device.timeout}"></label>
         <label>Telegram chat<select name="recipient">${selectedOptions}</select></label>
         <button class="primary" type="submit">Save device</button><output></output>
       </form></article>`;
@@ -156,8 +160,12 @@ class ZigbeePulsePanel extends HTMLElement {
     const formElement = event.target;
     const form = new FormData(formElement);
     const result = formElement.querySelector("output");
+    const device = entry.devices.find((item) => item.entity_id === formElement.dataset.entity);
+    const enteredTimeout = Number(form.get("timeout"));
+    const timeout = device && Number(device.rule.timeout) === 0 && enteredTimeout === Number(device.timeout)
+      ? 0 : enteredTimeout;
     await this._save({ type: "zigbee_pulse/update_config", entry_id: entry.entry_id, scope: "device", entity_id: formElement.dataset.entity, settings: {
-      enabled: form.get("enabled") === "on", offline: form.get("offline") === "on", recovery: form.get("recovery") === "on", timeout: Number(form.get("timeout")), recipient: form.get("recipient"),
+      enabled: form.get("enabled") === "on", offline: form.get("offline") === "on", recovery: form.get("recovery") === "on", timeout, recipient: form.get("recipient"),
     }}, result);
   }
 

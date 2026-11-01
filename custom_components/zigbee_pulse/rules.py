@@ -26,6 +26,11 @@ def timeout_for(entity_id, has_battery, settings):
     return settings["default_timeout"] * 60
 
 
+def timeout_minutes_for(entity_id, has_battery, settings):
+    """Return the configured timeout in minutes for a device."""
+    return int(timeout_for(entity_id, has_battery, settings) / 60)
+
+
 def age_seconds(value, now):
     """Accept ISO timestamps or Unix seconds/milliseconds; invalid means unknown."""
     try:
