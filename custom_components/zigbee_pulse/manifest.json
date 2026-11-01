@@ -1,0 +1,16 @@
+{
+  "domain": "zigbee_pulse",
+  "name": "Zigbee Pulse",
+  "version": "0.1.0",
+  "config_flow": true,
+  "dependencies": [
+    "mqtt",
+    "telegram_bot",
+    "frontend",
+    "http",
+    "panel_custom"
+  ],
+  "codeowners": [],
+  "integration_type": "helper",
+  "iot_class": "local_push"
+}

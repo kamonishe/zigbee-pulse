@@ -1,0 +1,72 @@
+{
+  "title": "Zigbee Pulse",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Zigbee Pulse",
+        "description": "Monitor Zigbee2MQTT last_seen sensors and send Telegram offline and recovery notifications.",
+        "data": {
+          "name": "Monitor name",
+          "recipient": "Default Telegram chat",
+          "default_timeout": "Other devices: timeout (minutes)",
+          "mains_timeout": "Mains devices: timeout (minutes)",
+          "temperature_timeout": "Temperature sensors: timeout (minutes)",
+          "startup_grace": "Startup grace period (minutes)",
+          "enabled": "Enable notifications"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Enter a monitor name.",
+      "invalid_recipient": "Select an enabled Telegram bot notification entity."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Manage Zigbee Pulse",
+        "menu_options": {
+          "settings": "Global settings",
+          "devices": "Configure a device"
+        }
+      },
+      "settings": {
+        "title": "Global notification settings",
+        "data": {
+          "name": "Monitor name",
+          "recipient": "Default Telegram chat",
+          "default_timeout": "Other devices: timeout (minutes)",
+          "mains_timeout": "Mains devices: timeout (minutes)",
+          "temperature_timeout": "Temperature sensors: timeout (minutes)",
+          "startup_grace": "Startup grace period (minutes)",
+          "enabled": "Enable notifications"
+        }
+      },
+      "devices": {
+        "title": "Choose a Zigbee device",
+        "description": "Found {count} enabled Zigbee2MQTT last_seen sensors. This list is refreshed whenever this screen opens.",
+        "data": {
+          "entity_id": "Device"
+        }
+      },
+      "device": {
+        "title": "Configure {entity_id}",
+        "description": "Tune this device independently. A timeout of 0 uses the category default.",
+        "data": {
+          "enabled": "Monitor this device",
+          "offline": "Notify when offline",
+          "recovery": "Notify when communication recovers",
+          "timeout": "Custom timeout (minutes; 0 = default)",
+          "recipient": "Telegram chat"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Enter a monitor name.",
+      "invalid_recipient": "Select an enabled Telegram bot notification entity."
+    }
+  },
+  "abort": {
+    "no_devices": "No enabled Zigbee2MQTT last_seen sensors were found."
+  }
+}
