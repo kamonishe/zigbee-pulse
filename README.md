@@ -1,6 +1,6 @@
 # Zigbee Pulse
 
-Zigbee Pulse is a Home Assistant custom integration for Zigbee2MQTT health monitoring and per-device Telegram alerts. It discovers Zigbee2MQTT `last_seen` sensors, applies separate mains and battery timeouts, and provides a live sidebar dashboard for notification rules and Telegram message templates.
+Zigbee Pulse is a Home Assistant integration for Zigbee2MQTT device connection monitoring with per-device Telegram alerts, mains and battery timeouts, and a live dashboard.
 
 ## Installation with HACS
 
