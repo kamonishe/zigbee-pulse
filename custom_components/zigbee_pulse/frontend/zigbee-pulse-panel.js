@@ -115,26 +115,36 @@ class ZigbeePulsePanel extends HTMLElement {
       Object.prototype.hasOwnProperty.call(values, name) ? values[name] : `[unknown: ${name}]`);
   }
 
-  _messagePreview(entry) {
-    const kind = this.shadowRoot.querySelector("#preview-kind")?.value || "offline";
+  _messagePreview(entry, kind) {
     const template = this.shadowRoot.querySelector(`#${kind}-template`)?.value
       ?? entry.settings[`${kind}_template`];
     return this._renderMessageTemplate(template, this._messageValues(entry, kind));
   }
 
   _updateMessagePreview(entry) {
-    const preview = this.shadowRoot.querySelector("#message-preview");
-    if (preview) preview.textContent = this._messagePreview(entry);
-    const status = this.shadowRoot.querySelector("#message-parser-status");
-    if (!status) return;
-    const kind = this.shadowRoot.querySelector("#preview-kind")?.value || "offline";
-    const template = this.shadowRoot.querySelector(`#${kind}-template`)?.value || "";
     const allowed = new Set(["monitor_name", "event", "status", "device_name", "entity_id", "timestamp", "newly_stale", "stale_count", "stale_list", "recovered_count", "recovered_list"]);
-    const unknown = [...new Set([...template.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map((match) => match[1]).filter((name) => !allowed.has(name)))];
-    status.textContent = unknown.length
-      ? `Unknown variable${unknown.length === 1 ? "" : "s"}: ${unknown.map((name) => `{${name}}`).join(", ")}`
-      : "";
-    status.className = unknown.length ? "template-status error" : "template-status";
+    ["offline", "recovery"].forEach((kind) => {
+      const preview = this.shadowRoot.querySelector(`#${kind}-message-preview`);
+      if (preview) preview.textContent = this._messagePreview(entry, kind);
+      const status = this.shadowRoot.querySelector(`#${kind}-message-parser-status`);
+      if (!status) return;
+      const template = this.shadowRoot.querySelector(`#${kind}-template`)?.value || "";
+      const unknown = [...new Set([...template.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map((match) => match[1]).filter((name) => !allowed.has(name)))];
+      status.textContent = unknown.length
+        ? `Unknown variable${unknown.length === 1 ? "" : "s"}: ${unknown.map((name) => `{${name}}`).join(", ")}`
+        : "";
+      status.className = unknown.length ? "template-status error" : "template-status";
+    });
+    this._syncMessagePanelHeights();
+  }
+
+  _syncMessagePanelHeights() {
+    const panels = ["offline-template", "offline-message-preview", "recovery-template", "recovery-message-preview"]
+      .map((id) => this.shadowRoot.querySelector(`#${id}`))
+      .filter(Boolean);
+    panels.forEach((panel) => { panel.style.height = "auto"; });
+    const height = Math.max(80, ...panels.map((panel) => panel.scrollHeight)) + 2;
+    panels.forEach((panel) => { panel.style.height = `${height}px`; });
   }
 
   _render() {
@@ -180,12 +190,17 @@ class ZigbeePulsePanel extends HTMLElement {
           <p class="muted">Edit the offline and recovery messages. The preview parses variables against the current device data as you type.</p>
           <form id="message-form">
             <div class="message-panels">
-              <label>Offline message<textarea id="offline-template" name="offline_template" rows="14">${this._escape(settings.offline_template)}</textarea></label>
-              <label>Recovery message<textarea id="recovery-template" name="recovery_template" rows="14">${this._escape(settings.recovery_template)}</textarea></label>
+              <label><span class="message-label">Offline message</span><textarea id="offline-template" name="offline_template" rows="1">${this._escape(settings.offline_template)}</textarea></label>
               <div class="preview-panel">
-                <div class="preview-heading"><h3>Live result</h3><select id="preview-kind"><option value="offline">Offline preview</option><option value="recovery">Recovery preview</option></select></div>
-                <pre id="message-preview" class="message-preview"></pre>
-                <p id="message-parser-status" class="template-status"></p>
+                <div class="preview-heading"><h3>Offline live result</h3></div>
+                <pre id="offline-message-preview" class="message-preview"></pre>
+                <p id="offline-message-parser-status" class="template-status"></p>
+              </div>
+              <label><span class="message-label">Recovery message</span><textarea id="recovery-template" name="recovery_template" rows="1">${this._escape(settings.recovery_template)}</textarea></label>
+              <div class="preview-panel">
+                <div class="preview-heading"><h3>Recovery live result</h3></div>
+                <pre id="recovery-message-preview" class="message-preview"></pre>
+                <p id="recovery-message-parser-status" class="template-status"></p>
               </div>
             </div>
             <p class="muted template-legend">Variables: <code>{monitor_name}</code> <code>{event}</code> <code>{device_name}</code> <code>{entity_id}</code> <code>{newly_stale}</code> <code>{stale_count}</code> <code>{stale_list}</code> <code>{recovered_count}</code> <code>{recovered_list}</code> <code>{timestamp}</code></p>
@@ -203,9 +218,9 @@ class ZigbeePulsePanel extends HTMLElement {
   _deviceCard(device, settings, live, recipientOptions) {
     const rule = device.rule;
     const status = this._status(device, live);
-    const inherited = Number(rule.timeout) === 0;
-    const timeoutLabel = inherited
-      ? `Timeout (minutes; global: ${device.timeout})`
+    const differsFromGlobal = Number(device.timeout) !== Number(device.global_timeout);
+    const timeoutLabel = differsFromGlobal
+      ? `Timeout (minutes; global: ${device.global_timeout})`
       : "Timeout (minutes)";
     const selectedOptions = recipientOptions.replace(`value="${this._escape(rule.recipient)}"`, `value="${this._escape(rule.recipient)}" selected`);
     const isBattery = device.power_source === "battery";
@@ -247,14 +262,13 @@ class ZigbeePulsePanel extends HTMLElement {
     });
     this.shadowRoot.querySelector("#test")?.addEventListener("click", async () => {
       await this._hass.callService("telegram_bot", "send_message", {
-        entity_id: entry.settings.recipient, message: this._messagePreview(entry), parse_mode: "plain_text",
+        entity_id: entry.settings.recipient, message: this._messagePreview(entry, "offline"), parse_mode: "plain_text",
       });
     });
     this.shadowRoot.querySelector("#global-form")?.addEventListener("submit", (event) => this._saveGlobal(event, entry));
     this.shadowRoot.querySelector("#message-form")?.addEventListener("submit", (event) => this._saveMessages(event, entry));
     ["#offline-template", "#recovery-template"].forEach((selector) =>
       this.shadowRoot.querySelector(selector)?.addEventListener("input", () => this._updateMessagePreview(entry)));
-    this.shadowRoot.querySelector("#preview-kind")?.addEventListener("change", () => this._updateMessagePreview(entry));
     this._updateMessagePreview(entry);
     this._bindDeviceForms(entry);
     this.shadowRoot.addEventListener("focusin", () => { this._editing = true; });
@@ -304,9 +318,9 @@ class ZigbeePulsePanel extends HTMLElement {
   }
 
   _styles() {
-    return `:host{display:block;color:var(--primary-text-color);background:var(--primary-background-color);min-height:100vh}main{max-width:2400px;margin:0 auto;padding:16px}header,.device-heading,.device-title{display:flex;align-items:center;justify-content:space-between;gap:16px}h1{font-size:28px;margin:0 0 6px}.brand{display:flex;align-items:center;gap:14px}.brand-icon{display:block;width:64px;height:64px;object-fit:contain}.brand p{margin:0}h2{font-size:20px;margin:0 0 12px}h3{margin:0 0 4px;font-size:17px}.card{background:var(--card-background-color);border-radius:12px;padding:14px;margin:12px 0;box-shadow:var(--ha-card-box-shadow,0 2px 6px #0002)}.summary{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px;margin:14px 0}.summary div{background:var(--card-background-color);border-radius:12px;padding:12px}.summary strong,.summary span{display:block}.summary strong{font-size:24px}.summary span,.muted,code{color:var(--secondary-text-color);font-size:13px}form{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;align-items:end}#message-form{display:block}.message-panels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:stretch}.message-panels>label{min-width:0}.message-panels textarea{width:100%;min-height:280px}.preview-panel{display:flex;flex-direction:column;gap:8px;min-width:0}.message-actions{display:flex;align-items:center;gap:8px;margin-top:10px}label{display:grid;gap:6px;font-size:13px}input,select,textarea{box-sizing:border-box;width:100%;padding:8px;border:1px solid var(--divider-color);border-radius:6px;background:var(--primary-background-color);color:var(--primary-text-color);font:inherit}textarea{resize:vertical;min-height:280px;line-height:1.4}.check{display:flex;display:flex;grid-template-columns:auto 1fr;align-items:center;gap:8px}.check input{width:auto}button,.button{border:0;border-radius:7px;padding:8px 12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;cursor:pointer;text-decoration:none;text-align:center}.primary{background:var(--primary-color);color:var(--text-primary-color,#fff)}output{color:var(--success-color,#4caf50);font-size:13px}.preview-heading{display:flex;flex-direction:column;align-items:stretch;gap:8px}.preview-heading h3{margin:0;font:inherit;font-size:13px;font-weight:400}.message-preview{flex:1;margin:0;padding:16px;min-height:280px;white-space:pre-wrap;overflow:auto;border:1px solid var(--divider-color);border-radius:8px;background:var(--primary-background-color);font-family:inherit;font-size:inherit;line-height:1.4}.template-status{margin:0;color:var(--secondary-text-color);font-size:13px}.template-legend{margin:0;padding-top:4px}.template-status.error{color:var(--error-color,#f44336)}.devices{display:grid;gap:14px}.device{border:1px solid var(--divider-color);border-left:5px solid var(--success-color,#4caf50);border-radius:8px;padding:16px}.device.offline{border-left-color:var(--error-color,#f44336)}.device.unknown,.device.unavailable{border-left-color:var(--disabled-text-color,var(--secondary-text-color,#9e9e9e))}.device-power{display:inline-flex;vertical-align:-3px;margin-right:7px;color:var(--secondary-text-color)}.device-power ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.pill{border-radius:999px;padding:4px 9px;font-size:12px;background:#19875422;color:var(--success-color,#4caf50)}.offline .pill{background:#f4433622;color:var(--error-color,#f44336)}.unknown .pill,.unavailable .pill{background:#9e9e9e33;color:var(--disabled-text-color,var(--secondary-text-color,#9e9e9e))}@media(max-width:900px){main{padding:16px}.summary{grid-template-columns:1fr 1fr}.message-panels{grid-template-columns:1fr}.summary button{grid-column:1/-1}}
+    return `:host{display:block;color:var(--primary-text-color);background:var(--primary-background-color);min-height:100vh}main{max-width:2400px;margin:0 auto;padding:16px}header,.device-heading,.device-title{display:flex;align-items:center;justify-content:space-between;gap:16px}h1{font-size:28px;margin:0 0 6px}.brand{display:flex;align-items:center;gap:14px}.brand-icon{display:block;width:64px;height:64px;object-fit:contain}.brand p{margin:0}h2{font-size:20px;margin:0 0 12px}h3{margin:0 0 4px;font-size:17px}.card{background:var(--card-background-color);border-radius:12px;padding:14px;margin:12px 0;box-shadow:var(--ha-card-box-shadow,0 2px 6px #0002)}.summary{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px;margin:14px 0}.summary div{background:var(--card-background-color);border-radius:12px;padding:12px}.summary strong,.summary span{display:block}.summary strong{font-size:24px}.summary span,.muted,code{color:var(--secondary-text-color);font-size:13px}form{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;align-items:end}#message-form{display:block}.message-panels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start}.message-panels>label{min-width:0;display:flex;flex-direction:column;gap:8px}.message-label{height:16px;line-height:16px;box-sizing:border-box}.message-panels textarea{width:100%;min-height:0;flex:none;font-family:inherit;font-size:13px;line-height:1.4;background:var(--card-background-color,#fafafa)}.preview-panel{display:flex;flex-direction:column;gap:8px;min-width:0}.message-actions{display:flex;align-items:center;gap:8px;margin-top:10px}label{display:grid;gap:6px;font-size:13px}input,select,textarea{box-sizing:border-box;width:100%;padding:8px;border:1px solid var(--divider-color);border-radius:6px;background:var(--primary-background-color);color:var(--primary-text-color);font:inherit}textarea{resize:none;min-height:0;line-height:1.4}.check{display:flex;display:flex;grid-template-columns:auto 1fr;align-items:center;gap:8px}.check input{width:auto}button,.button{border:0;border-radius:7px;padding:8px 12px;background:var(--secondary-background-color);color:var(--primary-text-color);font:inherit;cursor:pointer;text-decoration:none;text-align:center}.primary{background:var(--primary-color);color:var(--text-primary-color,#fff)}output{color:var(--success-color,#4caf50);font-size:13px}.preview-heading{display:flex;flex-direction:column;align-items:stretch;gap:8px;height:16px;line-height:16px;box-sizing:border-box}.preview-heading h3{margin:0;font:inherit;font-size:13px;font-weight:400}.message-preview{box-sizing:border-box;margin:0;padding:16px;min-height:0;font-family:inherit;font-size:13px;line-height:1.4;white-space:pre-wrap;overflow:hidden;border:1px solid var(--divider-color);border-radius:8px;background:var(--secondary-background-color,#f2f2f2);}.template-status{margin:0;color:var(--secondary-text-color);font-size:13px}.template-legend{margin:0;padding-top:4px}.template-status.error{color:var(--error-color,#f44336)}.devices{display:grid;gap:14px}.device{border:1px solid var(--divider-color);border-left:5px solid var(--success-color,#4caf50);border-radius:8px;padding:16px}.device.offline{border-left-color:var(--error-color,#f44336)}.device.unknown,.device.unavailable{border-left-color:var(--disabled-text-color,var(--secondary-text-color,#9e9e9e))}.device-power{display:inline-flex;vertical-align:-3px;margin-right:7px;color:var(--secondary-text-color)}.device-power ha-icon{--mdc-icon-size:18px;width:18px;height:18px}.pill{border-radius:999px;padding:4px 9px;font-size:12px;background:#19875422;color:var(--success-color,#4caf50)}.offline .pill{background:#f4433622;color:var(--error-color,#f44336)}.unknown .pill,.unavailable .pill{background:#9e9e9e33;color:var(--disabled-text-color,var(--secondary-text-color,#9e9e9e))}@media(max-width:900px){main{padding:16px}.summary{grid-template-columns:1fr 1fr}.message-panels{grid-template-columns:1fr}.summary button{grid-column:1/-1}}
 `;
   }
 }
 
-customElements.define("zigbee-pulse-panel", ZigbeePulsePanel);
+if (!customElements.get("zigbee-pulse-panel")) customElements.define("zigbee-pulse-panel", ZigbeePulsePanel);

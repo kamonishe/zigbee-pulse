@@ -49,8 +49,9 @@ def _devices(hass, settings):
         name = ((device.name_by_user or device.name) if device else None) or entity.entity_id
         state = hass.states.get(entity.entity_id)
         rule = DEVICE_DEFAULTS | {"recipient": settings["recipient"]} | settings.get("device_rules", {}).get(entity.entity_id, {})
-        timeout = rule["timeout"] or timeout_minutes_for(
+        global_timeout = timeout_minutes_for(
             entity.entity_id, entity.device_id in battery_devices, settings)
+        timeout = rule["timeout"] or global_timeout
         result.append({
             "entity_id": entity.entity_id,
             "name": name,
@@ -58,6 +59,7 @@ def _devices(hass, settings):
             "power_source": "battery" if entity.device_id in battery_devices else "mains",
             "rule": rule,
             "timeout": timeout,
+            "global_timeout": global_timeout,
         })
     return sorted(result, key=lambda item: item["name"].lower())
 
