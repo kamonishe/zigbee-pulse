@@ -5,12 +5,10 @@ Zigbee Pulse is a Home Assistant integration for Zigbee2MQTT device connection m
 ## Installation with HACS
 
 1. Open **HACS** in Home Assistant.
-2. Open the three-dot menu and choose **Custom repositories**.
-3. Enter `https://github.com/kamonishe/zigbee-pulse`.
-4. Select **Integration** as the repository type and choose **Add**.
-5. Open **Zigbee Pulse** in HACS and choose **Download**.
-6. Restart Home Assistant.
-7. Go to **Settings → Devices & services → Add integration**, search for **Zigbee Pulse**, and complete the setup.
+2. Search for **Zigbee Pulse**.
+3. Open the integration and choose **Download**.
+4. Restart Home Assistant.
+5. Go to **Settings → Devices & services → Add integration**, search for **Zigbee Pulse**, and complete the setup.
 
 HACS installs the integration under Home Assistant’s `custom_components/zigbee_pulse/` directory.
 
