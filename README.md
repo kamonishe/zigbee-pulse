@@ -4,8 +4,6 @@ Zigbee Pulse is a Home Assistant custom integration for Zigbee2MQTT health monit
 
 ## Installation with HACS
 
-The GitHub repository must be public because HACS cannot use private repositories. After the repository is public:
-
 1. Open **HACS** in Home Assistant.
 2. Open the three-dot menu and choose **Custom repositories**.
 3. Enter `https://github.com/kamonishe/zigbee-pulse`.
