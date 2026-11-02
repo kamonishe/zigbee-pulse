@@ -133,7 +133,7 @@ class ZigbeePulsePanel extends HTMLElement {
     const unknown = [...new Set([...template.matchAll(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].map((match) => match[1]).filter((name) => !allowed.has(name)))];
     status.textContent = unknown.length
       ? `Unknown variable${unknown.length === 1 ? "" : "s"}: ${unknown.map((name) => `{${name}}`).join(", ")}`
-      : "Preview updates as you type using the current monitored devices.";
+      : "";
     status.className = unknown.length ? "template-status error" : "template-status";
   }
 
