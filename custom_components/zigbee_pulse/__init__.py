@@ -41,7 +41,7 @@ async def _sync_sidebar(hass):
                 "embed_iframe": False,
                 "trust_external": False,
                 "handle_safe_area": False,
-                "module_url": f"{PANEL_PATH}/zigbee-pulse-panel.js?v=1.0.1-layout13",
+                "module_url": f"{PANEL_PATH}/zigbee-pulse-panel.js?v=1.0.2-layout13",
             }
         },
         require_admin=True,
