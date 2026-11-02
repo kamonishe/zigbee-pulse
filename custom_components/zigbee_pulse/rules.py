@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import math
 import re
 
-from .const import MAINS_SUFFIXES, OFFLINE_TEMPLATE, RECOVERY_TEMPLATE, TEMPLATE_FIELDS
+from .const import OFFLINE_TEMPLATE, RECOVERY_TEMPLATE, TEMPLATE_FIELDS
 
 
 @dataclass(frozen=True)
@@ -20,11 +20,10 @@ class DeviceHealth:
 
 
 def timeout_for(entity_id, has_battery, settings):
-    if "temperature" in entity_id:
-        return settings["temperature_timeout"] * 60
-    if entity_id.endswith(MAINS_SUFFIXES) and not has_battery:
-        return settings["mains_timeout"] * 60
-    return settings["default_timeout"] * 60
+    """Return the battery or mains timeout for a Zigbee device."""
+    del entity_id
+    key = "battery_timeout" if has_battery else "mains_timeout"
+    return settings[key] * 60
 
 
 def timeout_minutes_for(entity_id, has_battery, settings):

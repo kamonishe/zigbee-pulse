@@ -5,7 +5,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er, selector
 
-from .const import DEFAULTS, DEVICE_DEFAULTS, DOMAIN
+from .const import DEVICE_DEFAULTS, DOMAIN, merged_settings
 from .coordinator import is_last_seen
 from .rules import timeout_minutes_for
 
@@ -29,14 +29,13 @@ def _telegram_selector():
 
 
 def _global_schema(values):
-    values = DEFAULTS | values
+    values = merged_settings(values)
     minutes = vol.All(vol.Coerce(int), vol.Range(min=1, max=10080))
     return vol.Schema({
         vol.Required("name", default=values["name"]): selector.TextSelector(),
         vol.Required("recipient", default=values["recipient"]): _telegram_selector(),
-        vol.Required("default_timeout", default=values["default_timeout"]): minutes,
         vol.Required("mains_timeout", default=values["mains_timeout"]): minutes,
-        vol.Required("temperature_timeout", default=values["temperature_timeout"]): minutes,
+        vol.Required("battery_timeout", default=values["battery_timeout"]): minutes,
         vol.Required("startup_grace", default=values["startup_grace"]): vol.All(
             vol.Coerce(int), vol.Range(min=0, max=120)),
         vol.Required("enabled", default=values["enabled"]): selector.BooleanSelector(),
@@ -105,7 +104,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class OptionsFlow(config_entries.OptionsFlow):
     def _values(self):
-        return DEFAULTS | dict(self.config_entry.data) | dict(self.config_entry.options)
+        return merged_settings(self.config_entry.data, self.config_entry.options)
 
     def _save(self, values):
         self.hass.config_entries.async_update_entry(self.config_entry, title=values["name"])

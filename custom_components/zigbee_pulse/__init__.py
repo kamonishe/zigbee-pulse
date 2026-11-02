@@ -8,7 +8,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.start import async_at_started
 from homeassistant.components.http import StaticPathConfig
 
-from .const import DEFAULTS, DOMAIN
+from .const import DOMAIN, merged_settings
 from .coordinator import HealthCoordinator
 from .websocket import async_register as async_register_websocket
 
@@ -17,7 +17,7 @@ PANEL_PATH = f"/{DOMAIN}_panel"
 
 
 def _settings(entry):
-    return DEFAULTS | dict(entry.data) | dict(entry.options)
+    return merged_settings(entry.data, entry.options)
 
 
 async def _sync_sidebar(hass):

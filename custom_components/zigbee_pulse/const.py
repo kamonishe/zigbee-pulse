@@ -12,18 +12,33 @@ DEFAULTS = {
     "enabled": True,
     "show_sidebar": True,
     "recipient": "",
-    "default_timeout": 360,
+    "battery_timeout": 360,
     "mains_timeout": 30,
-    "temperature_timeout": 30,
     "startup_grace": 10,
     "offline_template": OFFLINE_TEMPLATE,
     "recovery_template": RECOVERY_TEMPLATE,
     "device_rules": {},
 }
-MAINS_SUFFIXES = (
-    "_socket_last_seen", "_light_switch_last_seen", "_gate_switch_last_seen",
-    "_lamp_last_seen", "_router_last_seen", "_air_compressor_last_seen",
-)
+def merged_settings(*sources):
+    """Merge settings and migrate the pre-1.0.1 timeout names."""
+    merged = dict(DEFAULTS)
+    legacy_battery_timeout = None
+    has_battery_timeout = False
+    for source in sources:
+        if not source:
+            continue
+        source = dict(source)
+        if "battery_timeout" in source:
+            has_battery_timeout = True
+        if "default_timeout" in source:
+            legacy_battery_timeout = source["default_timeout"]
+        merged.update(source)
+    if not has_battery_timeout and legacy_battery_timeout is not None:
+        merged["battery_timeout"] = legacy_battery_timeout
+    merged.pop("default_timeout", None)
+    merged.pop("temperature_timeout", None)
+    return merged
+
 DEVICE_DEFAULTS = {
     "enabled": True,
     "offline": True,

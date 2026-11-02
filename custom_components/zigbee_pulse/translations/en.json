@@ -8,9 +8,8 @@
         "data": {
           "name": "Monitor name",
           "recipient": "Default Telegram chat",
-          "default_timeout": "Other devices: timeout (minutes)",
+          "battery_timeout": "Battery devices: timeout (minutes)",
           "mains_timeout": "Mains devices: timeout (minutes)",
-          "temperature_timeout": "Temperature sensors: timeout (minutes)",
           "startup_grace": "Startup grace period (minutes)",
           "enabled": "Enable notifications"
         }
@@ -38,9 +37,8 @@
         "data": {
           "name": "Monitor name",
           "recipient": "Default Telegram chat",
-          "default_timeout": "Other devices: timeout (minutes)",
+          "battery_timeout": "Battery devices: timeout (minutes)",
           "mains_timeout": "Mains devices: timeout (minutes)",
-          "temperature_timeout": "Temperature sensors: timeout (minutes)",
           "startup_grace": "Startup grace period (minutes)",
           "enabled": "Enable notifications"
         }

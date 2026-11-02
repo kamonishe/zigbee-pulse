@@ -167,9 +167,8 @@ class ZigbeePulsePanel extends HTMLElement {
           <form id="global-form">
             <label>Monitor name<input name="name" value="${this._escape(settings.name)}"></label>
             <label>Default Telegram chat<select name="recipient">${recipientOptions}</select></label>
-            <label>Other device timeout (minutes)<input type="number" min="1" name="default_timeout" value="${settings.default_timeout}"></label>
+            <label>Battery timeout (minutes)<input type="number" min="1" name="battery_timeout" value="${settings.battery_timeout}"></label>
             <label>Mains timeout (minutes)<input type="number" min="1" name="mains_timeout" value="${settings.mains_timeout}"></label>
-            <label>Temperature timeout (minutes)<input type="number" min="1" name="temperature_timeout" value="${settings.temperature_timeout}"></label>
             <label>Startup grace (minutes)<input type="number" min="0" name="startup_grace" value="${settings.startup_grace}"></label>
             <label class="check"><input type="checkbox" name="enabled" ${settings.enabled ? "checked" : ""}> Enable notifications</label>
             <label class="check"><input type="checkbox" name="show_sidebar" ${settings.show_sidebar ? "checked" : ""}> Show Zigbee Pulse in sidebar</label>
@@ -267,7 +266,7 @@ class ZigbeePulsePanel extends HTMLElement {
     const form = new FormData(event.target);
     const result = event.target.querySelector("output");
     await this._save({ type: "zigbee_pulse/update_config", entry_id: entry.entry_id, scope: "global", settings: {
-      name: form.get("name"), recipient: form.get("recipient"), default_timeout: Number(form.get("default_timeout")), mains_timeout: Number(form.get("mains_timeout")), temperature_timeout: Number(form.get("temperature_timeout")), startup_grace: Number(form.get("startup_grace")), enabled: form.get("enabled") === "on", show_sidebar: form.get("show_sidebar") === "on",
+      name: form.get("name"), recipient: form.get("recipient"), mains_timeout: Number(form.get("mains_timeout")), battery_timeout: Number(form.get("battery_timeout")), startup_grace: Number(form.get("startup_grace")), enabled: form.get("enabled") === "on", show_sidebar: form.get("show_sidebar") === "on",
     }}, result);
   }
 

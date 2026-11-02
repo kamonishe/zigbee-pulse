@@ -20,7 +20,7 @@ HACS installs the integration under Home Assistant’s `custom_components/zigbee
 
 Zigbee Pulse requires the Home Assistant **MQTT** and **Telegram Bot** integrations. During setup, select the Telegram notify entity that should receive alerts. The integration discovers enabled Zigbee2MQTT `last_seen` sensors whenever the device picker opens, so newly paired devices can be added without editing YAML.
 
-The sidebar dashboard provides global timeouts, per-device monitoring and notification rules, Telegram message templates with live previews, and a sidebar visibility toggle. A device timeout of `0` inherits the effective global timeout.
+The sidebar dashboard provides separate mains and battery timeouts, per-device monitoring and notification rules, Telegram message templates with live previews, and a sidebar visibility toggle. A device timeout of `0` inherits the effective global timeout.
 
 The integration establishes a baseline during the startup grace period, then sends grouped offline and recovery messages. It uses the existing Telegram Bot service and does not store a bot token.
 

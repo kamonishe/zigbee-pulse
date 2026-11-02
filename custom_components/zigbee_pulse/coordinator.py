@@ -8,7 +8,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DEFAULTS, DEVICE_DEFAULTS
+from .const import DEVICE_DEFAULTS, merged_settings
 from .rules import DeviceHealth, age_seconds, messages, split_message, timeout_for
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class HealthCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, entry):
         super().__init__(hass, _LOGGER, name="Zigbee Pulse",
                          update_interval=timedelta(minutes=1), config_entry=entry)
-        self.settings = DEFAULTS | dict(entry.data) | dict(entry.options)
+        self.settings = merged_settings(entry.data, entry.options)
         self.started_at = monotonic() if hass.is_running else None
         self.known_stale = None
         self.last_notification_error = None

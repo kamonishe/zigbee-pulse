@@ -5,7 +5,7 @@ from homeassistant.components import websocket_api
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import voluptuous as vol
 
-from .const import DEFAULTS, DEVICE_DEFAULTS, DOMAIN
+from .const import DEVICE_DEFAULTS, DOMAIN, merged_settings
 from .coordinator import is_last_seen
 from .rules import timeout_minutes_for, unknown_template_fields
 
@@ -69,7 +69,7 @@ async def ws_get_config(hass, connection, msg):
     entries = hass.config_entries.async_entries(DOMAIN)
     payload = []
     for entry in entries:
-        settings = DEFAULTS | dict(entry.data) | dict(entry.options)
+        settings = merged_settings(entry.data, entry.options)
         payload.append({
             "entry_id": entry.entry_id,
             "title": entry.title,
@@ -87,10 +87,10 @@ async def ws_update_config(hass, connection, msg):
     if entry is None:
         connection.send_error(msg["id"], "not_found", "Zigbee Pulse entry not found")
         return
-    settings = DEFAULTS | dict(entry.data) | dict(entry.options)
+    settings = merged_settings(entry.data, entry.options)
     incoming = msg.get("settings") or {}
     if msg["scope"] == "global":
-        allowed = {"name", "recipient", "default_timeout", "mains_timeout", "temperature_timeout", "startup_grace", "enabled", "show_sidebar", "offline_template", "recovery_template"}
+        allowed = {"name", "recipient", "mains_timeout", "battery_timeout", "startup_grace", "enabled", "show_sidebar", "offline_template", "recovery_template"}
         for template_key in ("offline_template", "recovery_template"):
             if template_key in incoming:
                 template = incoming[template_key]
