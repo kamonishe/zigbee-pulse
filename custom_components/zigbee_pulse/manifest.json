@@ -1,11 +1,11 @@
 {
   "domain": "zigbee_pulse",
   "name": "Zigbee Pulse",
-  "codeowners": [],
   "categories": [
     "computers_network.monitoring",
     "messaging_notifications.push_notifications"
   ],
+  "codeowners": [],
   "config_flow": true,
   "dependencies": [
     "mqtt",
