@@ -5,7 +5,15 @@ from homeassistant.components import websocket_api
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 import voluptuous as vol
 
-from .const import DEVICE_DEFAULTS, DOMAIN, merged_settings
+from .const import (
+    DEVICE_DEFAULTS,
+    DOMAIN,
+    MAX_STARTUP_GRACE_MINUTES,
+    MAX_TIMEOUT_MINUTES,
+    MIN_TIMEOUT_MINUTES,
+    merged_settings,
+    validate_minutes,
+)
 from .coordinator import is_last_seen
 from .rules import timeout_minutes_for, unknown_template_fields
 
@@ -104,7 +112,30 @@ async def ws_update_config(hass, connection, msg):
                     connection.send_error(msg["id"], "invalid_template", f"Unknown template variable(s): {', '.join(unknown)}")
                     return
         merged = settings | {key: incoming[key] for key in allowed if key in incoming}
-        if not merged["name"].strip() or not merged["recipient"]:
+        minute_ranges = {
+            "mains_timeout": (MIN_TIMEOUT_MINUTES, MAX_TIMEOUT_MINUTES),
+            "battery_timeout": (MIN_TIMEOUT_MINUTES, MAX_TIMEOUT_MINUTES),
+            "startup_grace": (0, MAX_STARTUP_GRACE_MINUTES),
+        }
+        try:
+            for key, (minimum, maximum) in minute_ranges.items():
+                merged[key] = validate_minutes(
+                    merged[key], minimum=minimum, maximum=maximum)
+        except ValueError:
+            connection.send_error(
+                msg["id"],
+                "invalid_timeout",
+                "Timeouts must be whole minutes; mains and battery values must be "
+                f"between {MIN_TIMEOUT_MINUTES} and {MAX_TIMEOUT_MINUTES}, and "
+                f"startup grace must be between 0 and {MAX_STARTUP_GRACE_MINUTES}",
+            )
+            return
+        if (
+            not isinstance(merged.get("name"), str)
+            or not merged["name"].strip()
+            or not isinstance(merged.get("recipient"), str)
+            or not merged["recipient"]
+        ):
             connection.send_error(msg["id"], "invalid", "Name and Telegram recipient are required")
             return
         hass.config_entries.async_update_entry(entry, title=merged["name"], options=merged)
@@ -116,6 +147,17 @@ async def ws_update_config(hass, connection, msg):
         allowed = {"enabled", "offline", "recovery", "timeout", "recipient"}
         rule = DEVICE_DEFAULTS | {"recipient": settings["recipient"]} | settings.get("device_rules", {}).get(entity_id, {})
         rule.update({key: incoming[key] for key in allowed if key in incoming})
+        try:
+            rule["timeout"] = validate_minutes(
+                rule["timeout"], minimum=0, maximum=MAX_TIMEOUT_MINUTES)
+        except ValueError:
+            connection.send_error(
+                msg["id"],
+                "invalid_timeout",
+                f"Device timeout must be 0 (inherit global) or between "
+                f"{MIN_TIMEOUT_MINUTES} and {MAX_TIMEOUT_MINUTES} minutes",
+            )
+            return
         rules = dict(settings.get("device_rules", {}))
         rules[entity_id] = rule
         settings["device_rules"] = rules

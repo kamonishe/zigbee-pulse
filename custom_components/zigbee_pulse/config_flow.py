@@ -5,7 +5,14 @@ from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er, selector
 
-from .const import DEVICE_DEFAULTS, DOMAIN, merged_settings
+from .const import (
+    DEVICE_DEFAULTS,
+    DOMAIN,
+    MAX_STARTUP_GRACE_MINUTES,
+    MAX_TIMEOUT_MINUTES,
+    MIN_TIMEOUT_MINUTES,
+    merged_settings,
+)
 from .coordinator import is_last_seen
 from .rules import timeout_minutes_for
 
@@ -30,14 +37,17 @@ def _telegram_selector():
 
 def _global_schema(values):
     values = merged_settings(values)
-    minutes = vol.All(vol.Coerce(int), vol.Range(min=1, max=10080))
+    minutes = vol.All(
+        vol.Coerce(int),
+        vol.Range(min=MIN_TIMEOUT_MINUTES, max=MAX_TIMEOUT_MINUTES),
+    )
     return vol.Schema({
         vol.Required("name", default=values["name"]): selector.TextSelector(),
         vol.Required("recipient", default=values["recipient"]): _telegram_selector(),
         vol.Required("mains_timeout", default=values["mains_timeout"]): minutes,
         vol.Required("battery_timeout", default=values["battery_timeout"]): minutes,
         vol.Required("startup_grace", default=values["startup_grace"]): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=120)),
+            vol.Coerce(int), vol.Range(min=0, max=MAX_STARTUP_GRACE_MINUTES)),
         vol.Required("enabled", default=values["enabled"]): selector.BooleanSelector(),
         vol.Required("show_sidebar", default=values["show_sidebar"]): selector.BooleanSelector(),
     })
@@ -69,7 +79,7 @@ def _device_schema(rule, recipient, inherited_timeout):
         vol.Required("offline", default=rule["offline"]): selector.BooleanSelector(),
         vol.Required("recovery", default=rule["recovery"]): selector.BooleanSelector(),
         vol.Required("timeout", default=timeout): vol.All(
-            vol.Coerce(int), vol.Range(min=0, max=10080)),
+            vol.Coerce(int), vol.Range(min=0, max=MAX_TIMEOUT_MINUTES)),
         vol.Required("recipient", default=rule["recipient"]): _telegram_selector(),
     })
 

@@ -177,9 +177,9 @@ class ZigbeePulsePanel extends HTMLElement {
           <form id="global-form">
             <label>Monitor name<input name="name" value="${this._escape(settings.name)}"></label>
             <label>Default Telegram chat<select name="recipient">${recipientOptions}</select></label>
-            <label>Battery timeout (minutes)<input type="number" min="1" name="battery_timeout" value="${settings.battery_timeout}"></label>
-            <label>Mains timeout (minutes)<input type="number" min="1" name="mains_timeout" value="${settings.mains_timeout}"></label>
-            <label>Startup grace (minutes)<input type="number" min="0" name="startup_grace" value="${settings.startup_grace}"></label>
+            <label>Battery timeout (minutes)<input type="number" min="1" max="10080" name="battery_timeout" value="${settings.battery_timeout}"></label>
+            <label>Mains timeout (minutes)<input type="number" min="1" max="10080" name="mains_timeout" value="${settings.mains_timeout}"></label>
+            <label>Startup grace (minutes)<input type="number" min="0" max="120" name="startup_grace" value="${settings.startup_grace}"></label>
             <label class="check"><input type="checkbox" name="enabled" ${settings.enabled ? "checked" : ""}> Enable notifications</label>
             <label class="check"><input type="checkbox" name="show_sidebar" ${settings.show_sidebar ? "checked" : ""}> Show Zigbee Pulse in sidebar</label>
             <button class="primary" type="submit">Save global settings</button><output id="global-result"></output>
@@ -231,7 +231,7 @@ class ZigbeePulsePanel extends HTMLElement {
         <label class="check"><input type="checkbox" name="enabled" ${rule.enabled ? "checked" : ""}> Monitor</label>
         <label class="check"><input type="checkbox" name="offline" ${rule.offline ? "checked" : ""}> Offline alerts</label>
         <label class="check"><input type="checkbox" name="recovery" ${rule.recovery ? "checked" : ""}> Recovery alerts</label>
-        <label>${timeoutLabel}<input type="number" min="0" name="timeout" value="${device.timeout}"></label>
+        <label>${timeoutLabel}<input type="number" min="0" max="10080" name="timeout" value="${device.timeout}"></label>
         <label>Telegram chat<select name="recipient">${selectedOptions}</select></label>
         <button class="primary" type="submit">Save device</button><output></output>
       </form></article>`;
@@ -275,12 +275,30 @@ class ZigbeePulsePanel extends HTMLElement {
     this.shadowRoot.addEventListener("focusout", () => { this._editing = false; });
   }
 
+  _readMinutes(form, name, minimum, maximum, label, result) {
+    const raw = String(form.get(name) ?? "").trim();
+    if (!/^\d+$/.test(raw)) {
+      result.textContent = ` ${label} must be a whole number between ${minimum} and ${maximum}`;
+      return null;
+    }
+    const value = Number(raw);
+    if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
+      result.textContent = ` ${label} must be between ${minimum} and ${maximum}`;
+      return null;
+    }
+    return value;
+  }
+
   async _saveGlobal(event, entry) {
     event.preventDefault();
     const form = new FormData(event.target);
     const result = event.target.querySelector("output");
+    const mainsTimeout = this._readMinutes(form, "mains_timeout", 1, 10080, "Mains timeout", result);
+    const batteryTimeout = this._readMinutes(form, "battery_timeout", 1, 10080, "Battery timeout", result);
+    const startupGrace = this._readMinutes(form, "startup_grace", 0, 120, "Startup grace", result);
+    if ([mainsTimeout, batteryTimeout, startupGrace].some((value) => value === null)) return;
     await this._save({ type: "zigbee_pulse/update_config", entry_id: entry.entry_id, scope: "global", settings: {
-      name: form.get("name"), recipient: form.get("recipient"), mains_timeout: Number(form.get("mains_timeout")), battery_timeout: Number(form.get("battery_timeout")), startup_grace: Number(form.get("startup_grace")), enabled: form.get("enabled") === "on", show_sidebar: form.get("show_sidebar") === "on",
+      name: form.get("name"), recipient: form.get("recipient"), mains_timeout: mainsTimeout, battery_timeout: batteryTimeout, startup_grace: startupGrace, enabled: form.get("enabled") === "on", show_sidebar: form.get("show_sidebar") === "on",
     }}, result);
   }
 
@@ -299,7 +317,8 @@ class ZigbeePulsePanel extends HTMLElement {
     const form = new FormData(formElement);
     const result = formElement.querySelector("output");
     const device = entry.devices.find((item) => item.entity_id === formElement.dataset.entity);
-    const enteredTimeout = Number(form.get("timeout"));
+    const enteredTimeout = this._readMinutes(form, "timeout", 0, 10080, "Device timeout", result);
+    if (enteredTimeout === null) return;
     const timeout = device && Number(device.rule.timeout) === 0 && enteredTimeout === Number(device.timeout)
       ? 0 : enteredTimeout;
     await this._save({ type: "zigbee_pulse/update_config", entry_id: entry.entry_id, scope: "device", entity_id: formElement.dataset.entity, settings: {
