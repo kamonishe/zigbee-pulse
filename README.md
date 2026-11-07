@@ -2,7 +2,23 @@
 
 Home Assistant integration for Zigbee2MQTT device connection monitoring with per-device Telegram alerts, mains and battery timeouts, and a live dashboard.
 
-## Installation with HACS
+<!-- ha-marketplace:exclude-start -->
+## Installation with Home Assistant Marketplace
+
+[![Open Zigbee Pulse in Home Assistant Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=kamonishe&repository=zigbee-pulse&category=integration)
+
+On Home Assistant **2026.11 and newer**:
+
+1. Open **Settings → Marketplace**.
+2. Search for **Zigbee Pulse**.
+3. Select **Install**.
+4. Complete the integration setup when Home Assistant opens it.
+
+The Marketplace is built into Home Assistant and installs Zigbee Pulse under `custom_components/zigbee_pulse/`.
+
+## Older Home Assistant versions
+
+On versions before **2026.11**, install Zigbee Pulse through HACS:
 
 1. Open **HACS** in Home Assistant.
 2. Search for **Zigbee Pulse**.
@@ -10,7 +26,11 @@ Home Assistant integration for Zigbee2MQTT device connection monitoring with per
 4. Restart Home Assistant.
 5. Go to **Settings → Devices & services → Add integration**, search for **Zigbee Pulse**, and complete the setup.
 
-HACS installs the integration under Home Assistant’s `custom_components/zigbee_pulse/` directory.
+## Manual installation
+
+Copy `custom_components/zigbee_pulse` into the `custom_components` directory in your Home Assistant configuration, restart Home Assistant, and add **Zigbee Pulse** from **Settings → Devices & services**.
+
+<!-- ha-marketplace:exclude-end -->
 
 ## Configuration
 
